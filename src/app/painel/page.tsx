@@ -5,8 +5,9 @@ import { SignOutButton } from "@/components/sign-out-button";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { grupo, membroGrupo } from "@/lib/group-schema";
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, isNotNull, isNull, or } from "drizzle-orm";
 import { treino } from "@/lib/training-schema";
+import { presenca } from "@/lib/training-schema";
 
 export default async function PainelPage({
   searchParams,
@@ -31,8 +32,22 @@ export default async function PainelPage({
     local: treino.local,
     data: treino.data,
     horario: treino.horario,
+    grupoId: treino.grupoId,
   }).from(treino)
-    .where(and(eq(treino.criadorId, session.user.id), isNull(treino.grupoId)))
+    .leftJoin(membroGrupo, and(
+      eq(membroGrupo.grupoId, treino.grupoId),
+      eq(membroGrupo.usuarioId, session.user.id),
+    ))
+    .leftJoin(presenca, and(
+      eq(presenca.treinoId, treino.id),
+      eq(presenca.usuarioId, session.user.id),
+      isNull(treino.grupoId),
+    ))
+    .where(or(
+      eq(treino.criadorId, session.user.id),
+      isNotNull(membroGrupo.id),
+      isNotNull(presenca.id),
+    ))
     .orderBy(asc(treino.data), asc(treino.horario));
 
   const { cadastro } = await searchParams;
@@ -69,12 +84,12 @@ export default async function PainelPage({
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <p className="text-sm font-semibold tracking-[0.2em] text-lime-300 uppercase">Meus eventos</p>
-              <h2 className="mt-2 text-2xl font-bold text-white">Treinos e partidas independentes</h2>
+              <h2 className="mt-2 text-2xl font-bold text-white">Treinos e partidas</h2>
             </div>
             <Link className="rounded-xl bg-lime-300 px-4 py-3 text-sm font-bold text-emerald-950" href="/treinos/novo">Criar evento</Link>
           </div>
           {meusTreinos.length === 0 ? (
-            <p className="mt-7 rounded-2xl border border-dashed border-white/15 p-6 text-slate-300">Você ainda não criou treinos ou partidas independentes.</p>
+            <p className="mt-7 rounded-2xl border border-dashed border-white/15 p-6 text-slate-300">Seus eventos independentes, dos seus grupos ou respondidos aparecerão aqui.</p>
           ) : (
             <ul className="mt-7 grid gap-4 sm:grid-cols-2">
               {meusTreinos.map((evento) => (
@@ -82,6 +97,7 @@ export default async function PainelPage({
                   <Link className="block h-full rounded-2xl border border-white/10 bg-black/10 p-5 transition hover:border-lime-300/40" href={`/treinos/${evento.id}`}>
                     <span className="text-xs font-semibold tracking-[0.15em] text-lime-300 uppercase">{evento.modalidade}</span>
                     <span className="mt-2 block text-xl font-bold text-white">{evento.titulo}</span>
+                    <span className="mt-2 block text-xs text-lime-200">{evento.grupoId ? "Evento de grupo" : "Evento independente"}</span>
                     <span className="mt-3 block text-sm text-slate-400">{evento.data.split("-").reverse().join("/")} · {evento.horario.slice(0, 5)} · {evento.local}</span>
                   </Link>
                 </li>

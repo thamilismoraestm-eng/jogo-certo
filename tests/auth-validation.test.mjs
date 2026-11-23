@@ -5,6 +5,8 @@ import { criarGrupoSchema, codigoConviteSchema } from "../src/lib/group-validati
 import { criarCodigoConvite } from "../src/lib/invite-code.ts";
 import { dadosTreinoSchema } from "../src/lib/training-validation.ts";
 import { instanteManaus, podeEditarTreino, podeVerTreino, treinoJaPassou } from "../src/lib/training-rules.ts";
+import { equipamentoLevadoSchema, equipamentoNecessarioSchema, respostaSchema } from "../src/lib/attendance-validation.ts";
+import { visibilidadePresencas } from "../src/lib/attendance-rules.ts";
 
 const cadastroValido = {
   nome: "Ana Silva",
@@ -129,4 +131,41 @@ test("somente o criador edita evento ativo que ainda não aconteceu", () => {
   assert.equal(podeEditarTreino({ ...base, usuarioId: "outro" }), false);
   assert.equal(podeEditarTreino({ ...base, usuarioId: "criador", status: "cancelado" }), false);
   assert.equal(podeEditarTreino({ ...base, usuarioId: "criador", agora: new Date("2026-06-01T15:00:00.000Z") }), false);
+});
+
+const respostasDoEvento = [
+  { usuarioId: "criador", resposta: "vou", nome: "Ana" },
+  { usuarioId: "bia", resposta: "nao_vou", nome: "Bia" },
+  { usuarioId: "caio", resposta: "vou", nome: "Caio" },
+];
+
+test("criador vê todas as respostas e o total de confirmações", () => {
+  const resultado = visibilidadePresencas(respostasDoEvento, "criador", "criador", false);
+  assert.equal(resultado.respostasVisiveis.length, 3);
+  assert.equal(resultado.confirmados, 2);
+  assert.equal(resultado.podeVerResponsaveis, true);
+});
+
+test("participante só vê a própria resposta antes da publicação", () => {
+  const resultado = visibilidadePresencas(respostasDoEvento, "bia", "criador", false);
+  assert.deepEqual(resultado.respostasVisiveis.map(({ usuarioId }) => usuarioId), ["bia"]);
+  assert.equal(resultado.confirmados, null);
+  assert.equal(resultado.podeVerResponsaveis, false);
+});
+
+test("após publicação, participante vê confirmados, mas não respostas negativas", () => {
+  const resultado = visibilidadePresencas(respostasDoEvento, "bia", "criador", true);
+  assert.deepEqual(resultado.respostasVisiveis.map(({ usuarioId }) => usuarioId), ["criador", "caio"]);
+  assert.equal(resultado.minhaResposta?.resposta, "nao_vou");
+  assert.equal(resultado.confirmados, 2);
+  assert.equal(resultado.podeVerResponsaveis, true);
+});
+
+test("valida equipamentos necessários e quantidades assumidas", () => {
+  assert.equal(equipamentoNecessarioSchema.safeParse({ nome: "Bolas", quantidade: "3" }).success, true);
+  assert.equal(equipamentoNecessarioSchema.safeParse({ nome: "B", quantidade: "0" }).success, false);
+  assert.equal(equipamentoLevadoSchema.safeParse({ treinoEquipamentoId: "00000000-0000-4000-8000-000000000001", quantidade: "2" }).success, true);
+  assert.equal(equipamentoLevadoSchema.safeParse({ treinoEquipamentoId: "não-é-id", quantidade: "1" }).success, false);
+  assert.equal(respostaSchema.safeParse("vou").success, true);
+  assert.equal(respostaSchema.safeParse("talvez").success, false);
 });

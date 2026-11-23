@@ -1,4 +1,11 @@
 // Drizzle Kit precisa enxergar as tabelas de autenticação e do aplicativo.
 export { account, session, user, verification } from "@/lib/auth-schema";
 export { grupo, membroGrupo, permissaoGrupo } from "@/lib/group-schema";
-export { statusTreino, treino } from "@/lib/training-schema";
+export {
+  equipamentoLevado,
+  presenca,
+  respostaPresenca,
+  statusTreino,
+  treino,
+  treinoEquipamento,
+} from "@/lib/training-schema";
