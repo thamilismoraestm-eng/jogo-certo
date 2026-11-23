@@ -15,6 +15,13 @@
       "when": 1795413601630,
       "tag": "0001_productive_shadowcat",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795451158362,
+      "tag": "0002_common_senator_kelly",
+      "breakpoints": true
     }
   ]
 }

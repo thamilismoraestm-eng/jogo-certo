@@ -12,13 +12,14 @@ try {
   const tables = await db.execute(sql`
     SELECT
       to_regclass('public.grupo') AS grupo,
-      to_regclass('public.membro_grupo') AS membro_grupo
+      to_regclass('public.membro_grupo') AS membro_grupo,
+      to_regclass('public.treino') AS treino
   `);
-  if (!tables.rows[0]?.grupo || !tables.rows[0]?.membro_grupo) {
-    throw new Error("As tabelas de grupos não foram encontradas no banco.");
+  if (!tables.rows[0]?.grupo || !tables.rows[0]?.membro_grupo || !tables.rows[0]?.treino) {
+    throw new Error("As tabelas de grupos ou de treinos não foram encontradas no banco.");
   }
 
-  console.log("Neon conectado: SELECT 1 retornou 1; grupo e membro_grupo existem.");
+  console.log("Neon conectado: SELECT 1 retornou 1; grupo, membro_grupo e treino existem.");
 } catch (error) {
   const reason = error instanceof Error ? error.cause ?? error : error;
   const message =

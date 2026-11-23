@@ -2,12 +2,13 @@ import { headers } from "next/headers";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { alias } from "drizzle-orm/pg-core";
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { grupo, membroGrupo } from "@/lib/group-schema";
 import { user } from "@/lib/auth-schema";
 import { removerMembroAction } from "@/lib/group-actions";
+import { treino } from "@/lib/training-schema";
 
 export default async function GrupoDetalhesPage({
   params,
@@ -42,6 +43,15 @@ export default async function GrupoDetalhesPage({
     permissao: membroGrupo.permissao,
   }).from(membroGrupo).innerJoin(participante, eq(membroGrupo.usuarioId, participante.id))
     .where(eq(membroGrupo.grupoId, groupId)).orderBy(participante.name);
+  const eventos = await db.select({
+    id: treino.id,
+    titulo: treino.titulo,
+    modalidade: treino.modalidade,
+    local: treino.local,
+    data: treino.data,
+    horario: treino.horario,
+  }).from(treino).where(eq(treino.grupoId, groupId))
+    .orderBy(asc(treino.data), asc(treino.horario));
   const { erro, removido } = await searchParams;
   const administrador = associacaoAtual.permissao === "admin";
   const linkConvite = `${process.env.BETTER_AUTH_URL ?? "http://localhost:3000"}/grupos/entrar?codigo=${dadosGrupo.codigoConvite}`;
@@ -65,6 +75,31 @@ export default async function GrupoDetalhesPage({
           <p className="mt-2 text-sm text-slate-300">Compartilhe o código ou o link com quem vai participar.</p>
           <p className="mt-4 break-all rounded-xl bg-black/20 p-4 font-mono text-lime-200">{dadosGrupo.codigoConvite}</p>
           <p className="mt-3 break-all text-sm text-slate-400">{linkConvite}</p>
+        </section>
+
+        <section className="mt-6 rounded-3xl border border-white/10 bg-white/[0.04] p-6 sm:p-8">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-bold text-white">Treinos e partidas do grupo</h2>
+              <p className="mt-2 text-sm text-slate-400">Visíveis para integrantes deste grupo.</p>
+            </div>
+            <Link className="rounded-xl bg-lime-300 px-4 py-3 text-sm font-bold text-emerald-950" href={`/grupos/${groupId}/treinos/novo`}>Criar evento</Link>
+          </div>
+          {eventos.length === 0 ? (
+            <p className="mt-6 rounded-2xl border border-dashed border-white/15 p-5 text-slate-300">O grupo ainda não tem treinos ou partidas.</p>
+          ) : (
+            <ul className="mt-6 grid gap-4 sm:grid-cols-2">
+              {eventos.map((evento) => (
+                <li key={evento.id}>
+                  <Link className="block h-full rounded-2xl border border-white/10 bg-black/10 p-5 transition hover:border-lime-300/40" href={`/treinos/${evento.id}`}>
+                    <span className="text-xs font-semibold tracking-[0.15em] text-lime-300 uppercase">{evento.modalidade}</span>
+                    <span className="mt-2 block text-xl font-bold text-white">{evento.titulo}</span>
+                    <span className="mt-3 block text-sm text-slate-400">{evento.data.split("-").reverse().join("/")} · {evento.horario.slice(0, 5)} · {evento.local}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
 
         <section className="mt-6 rounded-3xl border border-white/10 bg-white/[0.04] p-6 sm:p-8">

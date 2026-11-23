@@ -6,7 +6,7 @@ import { useState, type FormEvent } from "react";
 import { authClient } from "@/lib/auth-client";
 import { loginSchema, type LoginForm as LoginFields } from "@/lib/auth-validation";
 
-export default function LoginForm({ didSignOut }: { didSignOut: boolean }) {
+export default function LoginForm({ didSignOut, returnTo }: { didSignOut: boolean; returnTo?: string }) {
   const router = useRouter();
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof LoginFields, string>>>({});
   const [formError, setFormError] = useState("");
@@ -48,7 +48,10 @@ export default function LoginForm({ didSignOut }: { didSignOut: boolean }) {
         return;
       }
 
-      router.replace("/painel");
+      const destinoSeguro = returnTo?.startsWith("/") && !returnTo.startsWith("//")
+        ? returnTo
+        : "/painel";
+      router.replace(destinoSeguro);
       router.refresh();
     } catch {
       setFormError("Não foi possível conectar. Tente novamente em instantes.");

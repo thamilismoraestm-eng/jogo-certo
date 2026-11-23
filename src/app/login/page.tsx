@@ -3,9 +3,9 @@ import LoginForm from "./login-form";
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ logout?: string }>;
+  searchParams: Promise<{ logout?: string; returnTo?: string }>;
 }) {
-  const { logout } = await searchParams;
+  const { logout, returnTo } = await searchParams;
 
-  return <LoginForm didSignOut={logout === "sucesso"} />;
+  return <LoginForm didSignOut={logout === "sucesso"} returnTo={returnTo} />;
 }
