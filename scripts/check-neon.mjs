@@ -9,7 +9,16 @@ try {
     throw new Error("A consulta retornou um resultado inesperado.");
   }
 
-  console.log("Conexão com o PostgreSQL comprovada: SELECT 1 retornou 1.");
+  const tables = await db.execute(sql`
+    SELECT
+      to_regclass('public.grupo') AS grupo,
+      to_regclass('public.membro_grupo') AS membro_grupo
+  `);
+  if (!tables.rows[0]?.grupo || !tables.rows[0]?.membro_grupo) {
+    throw new Error("As tabelas de grupos não foram encontradas no banco.");
+  }
+
+  console.log("Neon conectado: SELECT 1 retornou 1; grupo e membro_grupo existem.");
 } catch (error) {
   const reason = error instanceof Error ? error.cause ?? error : error;
   const message =
