@@ -15,6 +15,7 @@ import {
 } from "../src/lib/training-rules.ts";
 import { equipamentoLevadoSchema, equipamentoNecessarioSchema, respostaSchema } from "../src/lib/attendance-validation.ts";
 import { visibilidadePresencas } from "../src/lib/attendance-rules.ts";
+import { podeAdministrarGrupo, podeExcluirGrupo } from "../src/lib/group-rules.ts";
 
 const cadastroValido = {
   nome: "Ana Silva",
@@ -190,4 +191,18 @@ test("somente o criador pode publicar, e o cancelamento só pode ser feito uma v
   assert.equal(podeCancelarTreino("criador", "criador", "ativo"), true);
   assert.equal(podeCancelarTreino("participante", "criador", "ativo"), false);
   assert.equal(podeCancelarTreino("criador", "criador", "cancelado"), false);
+});
+
+test("somente o criador com papel de administrador pode excluir o grupo", () => {
+  assert.equal(podeExcluirGrupo("criador", "criador", "admin"), true);
+  assert.equal(podeExcluirGrupo("participante", "criador", "membro"), false);
+  assert.equal(podeExcluirGrupo("outro-admin", "criador", "admin"), false);
+  assert.equal(podeExcluirGrupo("criador", "criador", "membro"), false);
+  assert.equal(podeExcluirGrupo("criador", "criador", null), false);
+});
+
+test("somente administradores podem gerenciar integrantes e dados do grupo", () => {
+  assert.equal(podeAdministrarGrupo("admin"), true);
+  assert.equal(podeAdministrarGrupo("membro"), false);
+  assert.equal(podeAdministrarGrupo(null), false);
 });

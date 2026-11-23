@@ -24,7 +24,23 @@ try {
     throw new Error("As tabelas necessárias do Jogo Certo não foram encontradas no banco.");
   }
 
-  console.log("Neon conectado: SELECT 1 retornou 1; as tabelas de grupos, treinos, presenças e equipamentos existem.");
+  const cascades = await db.execute(sql`
+    SELECT conname, confdeltype
+    FROM pg_constraint
+    WHERE conname IN (
+      'membro_grupo_grupo_id_grupo_id_fk',
+      'treino_grupo_id_grupo_id_fk',
+      'presenca_treino_id_treino_id_fk',
+      'treino_equipamento_treino_id_treino_id_fk',
+      'equipamento_levado_presenca_id_presenca_id_fk',
+      'equipamento_levado_treino_equipamento_id_treino_equipamento_id_fk'
+    )
+  `);
+  if (cascades.rows.length !== 6 || cascades.rows.some((fk) => fk.confdeltype !== "c")) {
+    throw new Error("As regras de exclusão em cascata não correspondem ao schema esperado.");
+  }
+
+  console.log("Neon conectado: tabelas presentes e seis relações de exclusão em cascata confirmadas.");
 } catch (error) {
   const reason = error instanceof Error ? error.cause ?? error : error;
   const message =

@@ -7,7 +7,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { membroGrupo } from "@/lib/group-schema";
-import { podeVerTreino, treinoJaPassou } from "@/lib/training-rules";
+import { podeResponderTreino, treinoAceitaAlteracoes, treinoJaPassou } from "@/lib/training-rules";
 import { equipamentoLevado, presenca, treino, treinoEquipamento } from "@/lib/training-schema";
 import {
   equipamentoLevadoSchema,
@@ -32,13 +32,15 @@ async function eventoDisponivel(treinoId: string, usuarioId: string) {
     ehMembroDoGrupo = Boolean(membro);
   }
 
-  if (!podeVerTreino({
+  if (!podeResponderTreino({
     usuarioId,
     criadorId: evento.criadorId,
     grupoId: evento.grupoId,
     ehMembroDoGrupo,
+    status: evento.status,
+    data: evento.data,
+    horario: evento.horario.slice(0, 5),
   })) return null;
-  if (evento.status !== "ativo" || treinoJaPassou(evento.data, evento.horario.slice(0, 5))) return null;
   return evento;
 }
 
@@ -97,7 +99,7 @@ export async function adicionarEquipamentoNecessarioAction(
   if (!dados.success) return { erro: dados.error.issues[0]?.message ?? "Confira os dados do equipamento." };
 
   const [evento] = await db.select().from(treino).where(eq(treino.id, treinoId)).limit(1);
-  if (!evento || evento.criadorId !== usuario.id || evento.status !== "ativo" || treinoJaPassou(evento.data, evento.horario.slice(0, 5))) {
+  if (!evento || evento.criadorId !== usuario.id || !treinoAceitaAlteracoes(evento.status) || treinoJaPassou(evento.data, evento.horario.slice(0, 5))) {
     return { erro: "Somente o criador pode definir equipamentos antes do evento." };
   }
 

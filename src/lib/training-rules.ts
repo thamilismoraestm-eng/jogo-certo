@@ -55,6 +55,41 @@ export function deveAvisarMinimoParticipantes(confirmados: number, minimo: numbe
   return confirmados < minimo;
 }
 
+export function separarTreinosPorStatus<T extends { status: "ativo" | "cancelado" }>(treinos: T[]) {
+  return {
+    ativos: treinos.filter((treino) => treino.status === "ativo"),
+    cancelados: treinos.filter((treino) => treino.status === "cancelado"),
+  };
+}
+
+export function treinoAceitaAlteracoes(status: "ativo" | "cancelado"): boolean {
+  return status === "ativo";
+}
+
+export function podeResponderTreino({
+  usuarioId,
+  criadorId,
+  grupoId,
+  ehMembroDoGrupo,
+  status,
+  data,
+  horario,
+  agora,
+}: {
+  usuarioId: string | null;
+  criadorId: string;
+  grupoId: string | null;
+  ehMembroDoGrupo: boolean;
+  status: "ativo" | "cancelado";
+  data: string;
+  horario: string;
+  agora?: Date;
+}): boolean {
+  return podeVerTreino({ usuarioId, criadorId, grupoId, ehMembroDoGrupo })
+    && treinoAceitaAlteracoes(status)
+    && !treinoJaPassou(data, horario, agora);
+}
+
 export function podePublicarTreino(usuarioId: string, criadorId: string): boolean {
   return usuarioId === criadorId;
 }

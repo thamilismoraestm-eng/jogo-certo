@@ -7,5 +7,6 @@ export const criarGrupoSchema = z.object({
 });
 
 export const codigoConviteSchema = z.string().trim().regex(/^[a-zA-Z0-9]{8,64}$/, "Digite um código de convite válido.");
+export const grupoIdSchema = z.uuid("Grupo inválido.");
 
 export type EstadoFormulario = { erro?: string; sucesso?: string };

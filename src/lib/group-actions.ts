@@ -4,11 +4,13 @@ import { randomUUID } from "node:crypto";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { and, eq } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { criarGrupoSchema, codigoConviteSchema, type EstadoFormulario } from "@/lib/group-validation";
+import { criarGrupoSchema, codigoConviteSchema, grupoIdSchema, type EstadoFormulario } from "@/lib/group-validation";
 import { criarCodigoConvite } from "@/lib/invite-code";
 import { grupo, membroGrupo } from "@/lib/group-schema";
+import { podeAdministrarGrupo, podeExcluirGrupo, podeRemoverMembro } from "@/lib/group-rules";
 
 async function usuarioAtual() {
   const sessao = await auth.api.getSession({ headers: await headers() });
@@ -95,9 +97,87 @@ export async function removerMembroAction(formData: FormData): Promise<void> {
   const [permissao] = await db.select({ permissao: membroGrupo.permissao }).from(membroGrupo)
     .where(and(eq(membroGrupo.grupoId, groupId), eq(membroGrupo.usuarioId, usuario.id))).limit(1);
 
-  if (!grupoEncontrado || permissao?.permissao !== "admin" || !targetUserId || targetUserId === grupoEncontrado.criadorId) {
+  if (!grupoEncontrado || !targetUserId || !podeRemoverMembro(permissao?.permissao ?? null, grupoEncontrado.criadorId, targetUserId)) {
     redirect(`/grupos/${groupId}?erro=permissao`);
   }
   await db.delete(membroGrupo).where(and(eq(membroGrupo.grupoId, groupId), eq(membroGrupo.usuarioId, targetUserId)));
   redirect(`/grupos/${groupId}?removido=sucesso`);
+}
+
+export async function editarGrupoAction(_anterior: EstadoFormulario, formData: FormData): Promise<EstadoFormulario> {
+  const usuario = await usuarioAtual();
+  if (!usuario) return { erro: "Entre na sua conta para editar o grupo." };
+
+  const validacaoId = grupoIdSchema.safeParse(formData.get("grupoId"));
+  if (!validacaoId.success) return { erro: "Grupo inválido." };
+  const groupId = validacaoId.data;
+  const dados = criarGrupoSchema.safeParse({
+    nome: formData.get("nome"),
+    descricao: formData.get("descricao") ?? "",
+    modalidade: formData.get("modalidade"),
+  });
+  if (!dados.success) return { erro: dados.error.issues[0]?.message ?? "Confira os dados do grupo." };
+
+  const [associacao] = await db.select({ permissao: membroGrupo.permissao }).from(membroGrupo)
+    .where(and(eq(membroGrupo.grupoId, groupId), eq(membroGrupo.usuarioId, usuario.id))).limit(1);
+  if (!podeAdministrarGrupo(associacao?.permissao ?? null)) return { erro: "Somente administradores podem editar o grupo." };
+
+  await db.update(grupo).set({
+    nome: dados.data.nome,
+    descricao: dados.data.descricao || null,
+    modalidade: dados.data.modalidade,
+  }).where(eq(grupo.id, groupId));
+  revalidatePath(`/grupos/${groupId}`);
+  redirect(`/grupos/${groupId}`);
+}
+
+export async function nomearAdministradorAction(formData: FormData): Promise<void> {
+  const usuario = await usuarioAtual();
+  if (!usuario) redirect("/login");
+  const validacaoId = grupoIdSchema.safeParse(formData.get("grupoId"));
+  if (!validacaoId.success) redirect("/painel?erro=grupo");
+  const groupId = validacaoId.data;
+  const targetUserId = String(formData.get("usuarioId") ?? "");
+
+  const [associacaoAtual] = await db.select({ permissao: membroGrupo.permissao }).from(membroGrupo)
+    .where(and(eq(membroGrupo.grupoId, groupId), eq(membroGrupo.usuarioId, usuario.id))).limit(1);
+  const [associacaoAlvo] = await db.select({ id: membroGrupo.id, permissao: membroGrupo.permissao }).from(membroGrupo)
+    .where(and(eq(membroGrupo.grupoId, groupId), eq(membroGrupo.usuarioId, targetUserId))).limit(1);
+  if (!podeAdministrarGrupo(associacaoAtual?.permissao ?? null) || !associacaoAlvo || associacaoAlvo.permissao === "admin") {
+    redirect(`/grupos/${groupId}?erro=grupo`);
+  }
+
+  await db.update(membroGrupo).set({ permissao: "admin" }).where(eq(membroGrupo.id, associacaoAlvo.id));
+  revalidatePath(`/grupos/${groupId}`);
+  redirect(`/grupos/${groupId}?administrador=sucesso`);
+}
+
+export async function excluirGrupoAction(formData: FormData): Promise<void> {
+  const usuario = await usuarioAtual();
+  if (!usuario) redirect("/login");
+
+  const validacao = grupoIdSchema.safeParse(formData.get("grupoId"));
+  if (!validacao.success) redirect("/painel?erro=exclusao");
+  const groupId = validacao.data;
+
+  const [grupoEncontrado] = await db.select({
+    id: grupo.id,
+    criadorId: grupo.criadorId,
+  }).from(grupo).where(eq(grupo.id, groupId)).limit(1);
+  const [associacao] = await db.select({ permissao: membroGrupo.permissao }).from(membroGrupo)
+    .where(and(eq(membroGrupo.grupoId, groupId), eq(membroGrupo.usuarioId, usuario.id))).limit(1);
+
+  if (!grupoEncontrado || !podeExcluirGrupo(usuario.id, grupoEncontrado.criadorId, associacao?.permissao ?? null)) {
+    redirect("/painel?erro=exclusao");
+  }
+
+  // Um DELETE no grupo é atômico; as FKs removem apenas membros e eventos vinculados.
+  // Presenças e equipamentos desses eventos também são removidos por suas próprias cascatas.
+  const [excluido] = await db.delete(grupo).where(and(
+    eq(grupo.id, groupId),
+    eq(grupo.criadorId, usuario.id),
+  )).returning({ id: grupo.id });
+
+  if (!excluido) redirect("/painel?erro=exclusao");
+  redirect("/painel?grupoExcluido=sucesso");
 }

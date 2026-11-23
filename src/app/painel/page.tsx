@@ -6,13 +6,13 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { grupo, membroGrupo } from "@/lib/group-schema";
 import { and, asc, eq, isNotNull, isNull, or } from "drizzle-orm";
-import { treino } from "@/lib/training-schema";
-import { presenca } from "@/lib/training-schema";
+import { presenca, treino } from "@/lib/training-schema";
+import { separarTreinosPorStatus } from "@/lib/training-rules";
 
 export default async function PainelPage({
   searchParams,
 }: {
-  searchParams: Promise<{ cadastro?: string }>;
+  searchParams: Promise<{ cadastro?: string; erro?: string; grupoExcluido?: string }>;
 }) {
   const session = await auth.api.getSession({ headers: await headers() });
 
@@ -33,6 +33,7 @@ export default async function PainelPage({
     data: treino.data,
     horario: treino.horario,
     grupoId: treino.grupoId,
+    status: treino.status,
   }).from(treino)
     .leftJoin(membroGrupo, and(
       eq(membroGrupo.grupoId, treino.grupoId),
@@ -49,8 +50,9 @@ export default async function PainelPage({
       isNotNull(presenca.id),
     ))
     .orderBy(asc(treino.data), asc(treino.horario));
+  const { ativos: treinosAtivos, cancelados: treinosCancelados } = separarTreinosPorStatus(meusTreinos);
 
-  const { cadastro } = await searchParams;
+  const { cadastro, erro, grupoExcluido } = await searchParams;
   const tipoUsuario = session.user.tipoUsuario === "professor" ? "Professor" : "Estudante";
 
   return (
@@ -67,6 +69,16 @@ export default async function PainelPage({
           {cadastro === "sucesso" && (
             <p className="mb-7 rounded-xl border border-lime-300/20 bg-lime-300/10 px-4 py-3 text-sm text-lime-200" role="status">
               Conta criada com sucesso. Boas-vindas ao Jogo Certo!
+            </p>
+          )}
+          {grupoExcluido === "sucesso" && (
+            <p className="mb-7 rounded-xl border border-lime-300/20 bg-lime-300/10 px-4 py-3 text-sm text-lime-200" role="status">
+              Grupo e eventos vinculados excluídos. Eventos independentes foram preservados.
+            </p>
+          )}
+          {erro === "exclusao" && (
+            <p className="mb-7 rounded-xl border border-rose-300/20 bg-rose-300/10 px-4 py-3 text-sm text-rose-100" role="alert">
+              Não foi possível excluir o grupo. Somente o criador que ainda é administrador pode fazer isso.
             </p>
           )}
           <p className="text-sm font-semibold tracking-[0.2em] text-lime-300 uppercase">
@@ -86,13 +98,16 @@ export default async function PainelPage({
               <p className="text-sm font-semibold tracking-[0.2em] text-lime-300 uppercase">Meus eventos</p>
               <h2 className="mt-2 text-2xl font-bold text-white">Treinos e partidas</h2>
             </div>
-            <Link className="rounded-xl bg-lime-300 px-4 py-3 text-sm font-bold text-emerald-950" href="/treinos/novo">Criar evento</Link>
+            <div className="flex flex-wrap gap-3">
+              <Link className="rounded-xl border border-white/15 px-4 py-3 text-sm font-semibold text-slate-100" href="/treinos/entrar">Entrar em evento</Link>
+              <Link className="rounded-xl bg-lime-300 px-4 py-3 text-sm font-bold text-emerald-950" href="/treinos/novo">Criar evento</Link>
+            </div>
           </div>
-          {meusTreinos.length === 0 ? (
+          {treinosAtivos.length === 0 ? (
             <p className="mt-7 rounded-2xl border border-dashed border-white/15 p-6 text-slate-300">Seus eventos independentes, dos seus grupos ou respondidos aparecerão aqui.</p>
           ) : (
             <ul className="mt-7 grid gap-4 sm:grid-cols-2">
-              {meusTreinos.map((evento) => (
+              {treinosAtivos.map((evento) => (
                 <li key={evento.id}>
                   <Link className="block h-full rounded-2xl border border-white/10 bg-black/10 p-5 transition hover:border-lime-300/40" href={`/treinos/${evento.id}`}>
                     <span className="text-xs font-semibold tracking-[0.15em] text-lime-300 uppercase">{evento.modalidade}</span>
@@ -104,6 +119,24 @@ export default async function PainelPage({
               ))}
             </ul>
           )}
+          {treinosCancelados.length > 0 && (
+            <details className="mt-7 rounded-2xl border border-red-300/20 bg-red-400/[0.04] p-5">
+              <summary className="cursor-pointer font-semibold text-red-100">Treinos cancelados ({treinosCancelados.length})</summary>
+              <ul className="mt-4 grid gap-4 sm:grid-cols-2">
+                {treinosCancelados.map((evento) => (
+                  <li key={evento.id}>
+                    <Link className="block h-full rounded-2xl border border-red-300/20 bg-black/10 p-5 transition hover:border-red-300/40" href={`/treinos/${evento.id}`}>
+                      <span className="inline-flex rounded-full bg-red-300/15 px-2.5 py-1 text-xs font-bold tracking-wide text-red-200">CANCELADO</span>
+                      <span className="mt-3 block text-xs font-semibold tracking-[0.15em] text-slate-300 uppercase">{evento.modalidade}</span>
+                      <span className="mt-2 block text-xl font-bold text-white">{evento.titulo}</span>
+                      <span className="mt-2 block text-xs text-slate-300">{evento.grupoId ? "Evento de grupo" : "Evento independente"}</span>
+                      <span className="mt-3 block text-sm text-slate-400">{evento.data.split("-").reverse().join("/")} · {evento.horario.slice(0, 5)} · {evento.local}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
         </section>
 
         <section className="mt-8 rounded-3xl border border-white/10 bg-white/[0.04] p-7 sm:p-9">
@@ -113,7 +146,7 @@ export default async function PainelPage({
               <h2 className="mt-2 text-2xl font-bold text-white">Sua turma em campo</h2>
             </div>
             <div className="flex flex-wrap gap-3">
-              <Link className="rounded-xl border border-white/15 px-4 py-3 text-sm font-semibold text-slate-100" href="/grupos/entrar">Usar convite</Link>
+              <Link className="rounded-xl border border-white/15 px-4 py-3 text-sm font-semibold text-slate-100" href="/grupos/entrar">Convite de grupo</Link>
               <Link className="rounded-xl bg-lime-300 px-4 py-3 text-sm font-bold text-emerald-950" href="/grupos/novo">Criar grupo</Link>
             </div>
           </div>

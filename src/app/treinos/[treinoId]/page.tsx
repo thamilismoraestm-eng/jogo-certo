@@ -14,6 +14,7 @@ import { AddEquipmentForm, CarryEquipmentForm, PresenceForm } from "@/app/treino
 import { deveAvisarMinimoParticipantes, podeCancelarTreino } from "@/lib/training-rules";
 import { CancelarTreinoButton } from "@/app/treinos/cancelar-button";
 import { publicarTreinoAction } from "@/lib/event-management-actions";
+import { InviteShare } from "@/app/treinos/invite-share";
 
 export default async function TreinoDetalhesPage({
   params,
@@ -104,9 +105,6 @@ export default async function TreinoDetalhesPage({
   const podeCancelar = podeCancelarTreino(sessao.user.id, evento.criadorId, evento.status);
   const { erro } = await searchParams;
   const dataExibida = evento.data.split("-").reverse().join("/");
-  const linkConvite = evento.codigoConvite
-    ? `${process.env.BETTER_AUTH_URL ?? "http://localhost:3000"}/treinos/convite/${evento.codigoConvite}`
-    : null;
 
   return (
     <main className="min-h-screen px-5 py-8 sm:px-8 sm:py-12">
@@ -156,14 +154,7 @@ export default async function TreinoDetalhesPage({
           </div>
         </section>
 
-        {linkConvite && (
-          <section className="mt-6 rounded-3xl border border-lime-300/20 bg-lime-300/[0.06] p-6 sm:p-8">
-            <h2 className="text-xl font-bold text-white">Convide para a partida</h2>
-            <p className="mt-2 text-sm text-slate-300">Usuários autenticados podem abrir este evento independente.</p>
-            <p className="mt-4 break-all rounded-xl bg-black/20 p-4 font-mono text-lime-200">{evento.codigoConvite}</p>
-            <p className="mt-3 break-all text-sm text-slate-400">{linkConvite}</p>
-          </section>
-        )}
+        {!evento.grupoId && ehCriador && evento.codigoConvite && <InviteShare codigo={evento.codigoConvite} />}
 
         <section className="mt-6 rounded-3xl border border-white/10 bg-white/[0.04] p-6 sm:p-8">
           <h2 className="text-2xl font-bold text-white">Presença</h2>

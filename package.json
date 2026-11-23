@@ -8,7 +8,7 @@
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint .",
-    "test": "node --experimental-strip-types --test tests/auth-validation.test.mjs",
+    "test": "vitest run tests/group-rules.test.ts && node --experimental-strip-types --test tests/auth-validation.test.mjs",
     "db:check": "node --env-file=.env.local --conditions=react-server scripts/check-neon.mjs",
     "db:generate": "node --env-file=.env.local node_modules/drizzle-kit/bin.cjs generate",
     "db:migrate": "node --env-file=.env.local node_modules/drizzle-kit/bin.cjs migrate"
@@ -35,6 +35,7 @@
     "eslint": "9.39.1",
     "eslint-config-next": "16.4.6",
     "tailwindcss": "4.3.5",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "vitest": "5.1.1"
   }
 }
