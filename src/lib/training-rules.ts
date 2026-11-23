@@ -51,6 +51,22 @@ export function treinoJaPassou(data: string, horario: string, agora = new Date()
   return instanteManaus(data, horario).getTime() <= agora.getTime();
 }
 
+export function deveAvisarMinimoParticipantes(confirmados: number, minimo: number): boolean {
+  return confirmados < minimo;
+}
+
+export function podePublicarTreino(usuarioId: string, criadorId: string): boolean {
+  return usuarioId === criadorId;
+}
+
+export function podeCancelarTreino(
+  usuarioId: string,
+  criadorId: string,
+  status: "ativo" | "cancelado",
+): boolean {
+  return usuarioId === criadorId && status === "ativo";
+}
+
 export function podeEditarTreino({
   usuarioId,
   criadorId,

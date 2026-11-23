@@ -11,8 +11,17 @@ import { podeEditarTreino, podeVerTreino, treinoJaPassou } from "@/lib/training-
 import { equipamentoLevado, presenca, treinoEquipamento } from "@/lib/training-schema";
 import { visibilidadePresencas } from "@/lib/attendance-rules";
 import { AddEquipmentForm, CarryEquipmentForm, PresenceForm } from "@/app/treinos/attendance-forms";
+import { deveAvisarMinimoParticipantes, podeCancelarTreino } from "@/lib/training-rules";
+import { CancelarTreinoButton } from "@/app/treinos/cancelar-button";
+import { publicarTreinoAction } from "@/lib/event-management-actions";
 
-export default async function TreinoDetalhesPage({ params }: { params: Promise<{ treinoId: string }> }) {
+export default async function TreinoDetalhesPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ treinoId: string }>;
+  searchParams: Promise<{ erro?: string }>;
+}) {
   const sessao = await auth.api.getSession({ headers: await headers() });
   if (!sessao) redirect("/login");
   const { treinoId } = await params;
@@ -87,6 +96,13 @@ export default async function TreinoDetalhesPage({ params }: { params: Promise<{
     horario,
   });
   const podeResponder = evento.status === "ativo" && !treinoJaPassou(evento.data, horario);
+  const confirmados = respostas.filter((resposta) => resposta.resposta === "vou").length;
+  const avisoMinimo = ehCriador
+    && evento.status === "ativo"
+    && !treinoJaPassou(evento.data, horario)
+    && deveAvisarMinimoParticipantes(confirmados, evento.minimoParticipantes);
+  const podeCancelar = podeCancelarTreino(sessao.user.id, evento.criadorId, evento.status);
+  const { erro } = await searchParams;
   const dataExibida = evento.data.split("-").reverse().join("/");
   const linkConvite = evento.codigoConvite
     ? `${process.env.BETTER_AUTH_URL ?? "http://localhost:3000"}/treinos/convite/${evento.codigoConvite}`
@@ -102,6 +118,28 @@ export default async function TreinoDetalhesPage({ params }: { params: Promise<{
             <Link className="rounded-xl border border-white/15 px-4 py-2 text-sm text-slate-200" href={evento.grupoId ? `/grupos/${evento.grupoId}` : "/painel"}>Voltar</Link>
           </div>
         </header>
+        {ehCriador && (
+          <section className="mt-6 flex flex-wrap items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+            {!evento.resultadoPublicado ? (
+              <form action={publicarTreinoAction}>
+                <input type="hidden" name="treinoId" value={evento.id} />
+                <button className="rounded-xl bg-lime-300 px-4 py-2.5 text-sm font-bold text-emerald-950">Publicar resultado</button>
+              </form>
+            ) : (
+              <p className="rounded-xl bg-lime-300/10 px-4 py-2.5 text-sm font-semibold text-lime-200" role="status">Resultado publicado</p>
+            )}
+            {podeCancelar && <CancelarTreinoButton treinoId={evento.id} />}
+          </section>
+        )}
+        {erro === "permissao" && <p className="mt-4 rounded-xl bg-red-400/10 p-4 text-sm text-red-200" role="alert">Somente o criador pode publicar ou cancelar este evento.</p>}
+        {evento.status === "cancelado" && (
+          <p className="mt-6 rounded-2xl border border-red-300/30 bg-red-400/10 p-5 font-semibold text-red-100" role="status">Este evento foi cancelado. Não são aceitas novas respostas nem alterações de equipamentos.</p>
+        )}
+        {avisoMinimo && (
+          <p className="mt-6 rounded-2xl border border-amber-300/30 bg-amber-300/10 p-5 text-amber-100" role="status">
+            O mínimo de {evento.minimoParticipantes} participantes ainda não foi atingido. Há {confirmados} confirmação(ões) “Vou”; faltam {evento.minimoParticipantes - confirmados}.
+          </p>
+        )}
         <section className="mt-10 rounded-3xl border border-white/10 bg-white/[0.04] p-7 sm:p-10">
           <p className="text-sm font-semibold tracking-[0.2em] text-lime-300 uppercase">{evento.modalidade} · {evento.grupoId ? "Evento de grupo" : "Evento independente"}</p>
           <h1 className="mt-3 text-4xl font-bold text-white sm:text-5xl">{evento.titulo}</h1>

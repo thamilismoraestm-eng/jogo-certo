@@ -4,7 +4,15 @@ import { cadastroSchema, loginSchema } from "../src/lib/auth-validation.ts";
 import { criarGrupoSchema, codigoConviteSchema } from "../src/lib/group-validation.ts";
 import { criarCodigoConvite } from "../src/lib/invite-code.ts";
 import { dadosTreinoSchema } from "../src/lib/training-validation.ts";
-import { instanteManaus, podeEditarTreino, podeVerTreino, treinoJaPassou } from "../src/lib/training-rules.ts";
+import {
+  deveAvisarMinimoParticipantes,
+  instanteManaus,
+  podeCancelarTreino,
+  podeEditarTreino,
+  podePublicarTreino,
+  podeVerTreino,
+  treinoJaPassou,
+} from "../src/lib/training-rules.ts";
 import { equipamentoLevadoSchema, equipamentoNecessarioSchema, respostaSchema } from "../src/lib/attendance-validation.ts";
 import { visibilidadePresencas } from "../src/lib/attendance-rules.ts";
 
@@ -168,4 +176,18 @@ test("valida equipamentos necessários e quantidades assumidas", () => {
   assert.equal(equipamentoLevadoSchema.safeParse({ treinoEquipamentoId: "não-é-id", quantidade: "1" }).success, false);
   assert.equal(respostaSchema.safeParse("vou").success, true);
   assert.equal(respostaSchema.safeParse("talvez").success, false);
+});
+
+test("avisa quando o número de confirmações está abaixo do mínimo", () => {
+  assert.equal(deveAvisarMinimoParticipantes(2, 3), true);
+  assert.equal(deveAvisarMinimoParticipantes(3, 3), false);
+  assert.equal(deveAvisarMinimoParticipantes(4, 3), false);
+});
+
+test("somente o criador pode publicar, e o cancelamento só pode ser feito uma vez", () => {
+  assert.equal(podePublicarTreino("criador", "criador"), true);
+  assert.equal(podePublicarTreino("participante", "criador"), false);
+  assert.equal(podeCancelarTreino("criador", "criador", "ativo"), true);
+  assert.equal(podeCancelarTreino("participante", "criador", "ativo"), false);
+  assert.equal(podeCancelarTreino("criador", "criador", "cancelado"), false);
 });
